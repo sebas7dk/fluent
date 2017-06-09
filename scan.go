@@ -15,10 +15,6 @@ type scanner struct {
 
 func (sc *scanner) Scan(val interface{}) error {
 	switch val.(type) {
-	case int:
-		if v, ok := val.(int); ok {
-			val = int64(v)
-		}
 	case []byte:
 		// Strings and floats come back as []uint8
 		if v, ok := val.([]uint8); ok {
@@ -74,7 +70,6 @@ func scanStruct(s interface{}, vals map[string]interface{}) error {
 }
 
 func setFieldValue(field reflect.Value, v interface{}) error {
-
 	switch field.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		val, ok := v.(int)
