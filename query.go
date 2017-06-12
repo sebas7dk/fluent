@@ -45,8 +45,11 @@ func (q *query) buildquery(options ...queryOption) {
 	}
 }
 
-func setInsert() queryOption {
+func setInsert(cols []string, args []interface{}) queryOption {
 	return func(q *query) {
+		q.columns = cols
+		q.args = args
+
 		vals := []string{}
 		for i := 1; i <= len(q.args); i++ {
 			vals = append(vals, fmt.Sprintf("$%d", i))
@@ -56,8 +59,13 @@ func setInsert() queryOption {
 	}
 }
 
-func setUpdate() queryOption {
+func setUpdate(values map[string]interface{}) queryOption {
 	return func(q *query) {
+		for col, arg := range values {
+			q.columns = append(q.columns, col)
+			q.args = append(q.args, arg)
+		}
+
 		stmt := fmt.Sprintf(updateStatement, q.table)
 
 		for _, col := range q.columns {

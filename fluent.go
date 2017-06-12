@@ -71,22 +71,14 @@ func (f *Fluent) Get(columns []string) *Fluent {
 	return f
 }
 
-func (f *Fluent) Insert(colums []string, args []interface{}) error {
-	f.query.columns = colums
-	f.query.args = args
-
-	f.query.buildquery(setInsert())
+func (f *Fluent) Insert(columns []string, args []interface{}) error {
+	f.query.buildquery(setInsert(columns, args))
 	return f.execute()
 }
 
 func (f *Fluent) Update(values map[string]interface{}) error {
-	for col, arg := range values {
-		f.query.columns = append(f.query.columns, col)
-		f.query.args = append(f.query.args, arg)
-	}
-
 	f.query.buildquery(
-		setUpdate(),
+		setUpdate(values),
 		setWhere(),
 	)
 

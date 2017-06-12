@@ -90,7 +90,11 @@ func setFieldValue(field reflect.Value, v interface{}) error {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		val, ok := v.(int64)
 		if !ok {
-			return fmt.Errorf("unable to set the integer value")
+			if intVal, ok := v.(int); ok {
+				val = int64(intVal)
+			} else {
+				return fmt.Errorf("unable to set the integer value")
+			}
 		}
 		field.SetInt(val)
 	case reflect.Float32, reflect.Float64:
