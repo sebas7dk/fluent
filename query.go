@@ -6,199 +6,150 @@ import (
 )
 
 const (
-	andStatement     = " AND = $%d"
-	whereStatement   = " WHERE = $%d"
-	groupByStatement = " GROUP BY %s"
-	orderByStatement = " ORDER BY %s"
-	limitStatement   = " LIMIT %s"
-	offsetStatement  = " OFFSET %s"
+	selectStatement   = "SELECT %s FROM %s"
+	insertStatement   = "INSERT INTO %s (%s) VALUES (%s)"
+	updateStatement   = "UPDATE %s SET"
+	joinStatement     = " INNER JOIN %s ON %s = %s"
+	leftJoinStatement = " LEFT JOIN %s ON %s = %s"
+	andStatement      = " AND %s %s $%d"
+	whereStatement    = " WHERE %s %s $%d"
+	groupByStatement  = " GROUP BY %s"
+	orderByStatement  = " ORDER BY %s"
+	limitStatement    = " LIMIT $%d"
+	offsetStatement   = " OFFSET $%d"
 )
 
 type query struct {
-	stmt    string
-	columns []string
-	from    string
-	where   map[string]interface{}
-	orderBy []string
-	groupBy []string
-	limit   string
-	offset  string
-	args    []interface{}
+	stmt             string
+	columns          []string
+	table            string
+	join, leftJoin   []string
+	where            [][]interface{}
+	orderBy, groupBy []string
+	limit, offset    int
+	args             []interface{}
+	argCounter       int
 }
 
-func (q *query) buildSelect(cols []string) string {
-	stmt := fmt.Sprintf("SELECT %s FROM %s", strings.Join(cols, ","), q.from)
-	stmt += q.whereStatement(stmt)
-	stmt += q.groupByStatement(stmt)
-	stmt += q.orderByStatement(stmt)
-	stmt += q.offsetStatement(stmt)
-	stmt += q.limitStatement(stmt)
-
-	return stmt
+func newQuery() *query {
+	return &query{
+		argCounter: 1,
+	}
 }
 
-func (q *query) whereStatement(stmt string) string {
-	var (
-		count    = 1
-		stmtType string
-	)
-	for column, value := range q.where {
-		q.args = append(q.args, value)
+type queryOption func(q *query)
 
-		stmtType = whereStatement
-		if count > 1 {
-			stmtType = andStatement
+func (q *query) buildquery(options ...queryOption) {
+	for _, option := range options {
+		option(q)
+	}
+}
+
+func setInsert() queryOption {
+	return func(q *query) {
+		vals := []string{}
+		for i := 1; i <= len(q.args); i++ {
+			vals = append(vals, fmt.Sprintf("$%d", i))
 		}
 
-		stmt += fmt.Sprintf(stmtType, column, count)
-		count++
+		q.stmt = fmt.Sprintf(insertStatement, q.table, strings.Join(q.columns, ","), strings.Join(vals, ","))
 	}
-
-	return stmt
 }
 
-func (q *query) groupByStatement(stmt string) string {
-	if q.groupBy != nil {
-		stmt += fmt.Sprintf(groupByStatement, strings.Join(q.groupBy, ","))
+func setUpdate() queryOption {
+	return func(q *query) {
+		stmt := fmt.Sprintf(updateStatement, q.table)
+
+		for _, col := range q.columns {
+			stmt += fmt.Sprintf(" %s = $%d,", col, q.argCounter)
+			q.argCounter++
+		}
+		// Remove the last comma
+		q.stmt = stmt[:len(stmt)-1]
 	}
-	return stmt
 }
 
-func (q *query) orderByStatement(stmt string) string {
-	if q.groupBy != nil {
-		stmt += fmt.Sprintf(orderByStatement, strings.Join(q.orderBy, ","))
+func setSelect() queryOption {
+	return func(q *query) {
+		q.stmt = fmt.Sprintf(selectStatement, strings.Join(q.columns, ","), q.table)
 	}
-	return stmt
 }
 
-func (q *query) limitStatement(stmt string) string {
-	if len(strings.TrimSpace(q.limit)) != 0 {
-		stmt += fmt.Sprintf(limitStatement, q.limit)
+func setWhere() queryOption {
+	return func(q *query) {
+		if len(q.where) == 0 {
+			return
+		}
+
+		var stmtType string
+		for _, where := range q.where {
+			if len(where) != 3 {
+				continue
+			}
+
+			column := where[0].(string)
+			operator := where[1].(string)
+			arg := where[2]
+
+			q.args = append(q.args, arg)
+
+			stmtType = whereStatement
+			if strings.Contains(q.stmt, "WHERE") {
+				stmtType = andStatement
+			}
+
+			q.stmt += fmt.Sprintf(stmtType, column, operator, q.argCounter)
+			q.argCounter++
+		}
 	}
-	return stmt
 }
 
-func (q *query) offsetStatement(stmt string) string {
-	if len(strings.TrimSpace(q.offset)) != 0 {
-		stmt += fmt.Sprintf(offsetStatement, q.limit)
+func setJoin() queryOption {
+	return func(q *query) {
+		if q.join != nil && len(q.join) == 3 {
+			q.stmt += fmt.Sprintf(joinStatement, q.join[0], q.join[1], q.join[2])
+		}
 	}
-	return stmt
 }
 
-func (q *query) From(table string) *query {
-	q.from = table
-	return q
+func setLeftJoin() queryOption {
+	return func(q *query) {
+		if q.leftJoin != nil && len(q.leftJoin) == 3 {
+			q.stmt += fmt.Sprintf(leftJoinStatement, q.leftJoin[0], q.leftJoin[1], q.leftJoin[2])
+		}
+	}
 }
 
-func (q *query) Where(column string, value interface{}) *query {
-	q.where[column] = value
-	return q
+func setGroupBy() queryOption {
+	return func(q *query) {
+		if q.groupBy != nil {
+			q.stmt += fmt.Sprintf(groupByStatement, strings.Join(q.groupBy, ","))
+		}
+	}
 }
 
-func (q *query) OrderBy(columns []string) *query {
-	q.orderBy = columns
-	return q
+func setOrderBy() queryOption {
+	return func(q *query) {
+		if q.orderBy != nil {
+			q.stmt += fmt.Sprintf(orderByStatement, strings.Join(q.orderBy, ","))
+		}
+	}
 }
 
-func (q *query) GroupBy(columns []string) *query {
-	q.groupBy = columns
-	return q
+func setLimit() queryOption {
+	return func(q *query) {
+		if q.limit > 0 {
+			q.args = append(q.args, q.limit)
+			q.stmt += fmt.Sprintf(limitStatement, q.argCounter)
+			q.argCounter++
+		}
+	}
 }
 
-func (q *query) Limit(limit string) *query {
-	q.limit = limit
-	return q
+func setOffest() queryOption {
+	return func(q *query) {
+		q.args = append(q.args, q.offset)
+		q.stmt += fmt.Sprintf(offsetStatement, q.argCounter)
+		q.argCounter++
+	}
 }
-
-func (q *query) Offset(offset string) *query {
-	q.offset = offset
-	return q
-}
-
-// func (m *Model) Update() {
-
-// }
-
-// func (m *Model) Insert() {
-
-// }
-// func (m *Model) Set(key, value string) {
-
-// }
-
-// func (m *Model) Get(columns []string) *Model {
-// 	m.query.queryType = singleQueryType
-// 	m.query.columns = columns
-// 	m.query.stmt = m.query.buildSelect(columns)
-// 	return m
-// }
-
-// func (m *Model) Scan(s interface{}) error {
-// 	prepare, err := m.db.Prepare(m.query.stmt)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer prepare.Close()
-
-// 	rows, err := prepare.Query(m.query.args...)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	var i int
-// 	result := make(map[string]interface{}, len(m.query.columns))
-// 	for rows.Next() {
-// 		row := make([]interface{}, len(m.query.columns))
-// 		for i := range m.query.columns {
-// 			row[i] = &Scanner{}
-// 		}
-
-// 		if err := rows.Scan(row...); err != nil {
-// 			return err
-// 		}
-
-// 		for i, column := range m.query.columns {
-// 			scanner := row[i].(*Scanner)
-// 			result[column] = scanner.value
-// 		}
-
-// 		scanStruct(s, result, i)
-// 	}
-
-// 	return nil
-// }
-
-// func (m *Model) All(s []interface{}) error {
-// 	prepare, err := m.db.Prepare(m.query.stmt)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer prepare.Close()
-
-// 	rows, err := prepare.Query(m.query.args...)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	result := make(map[string]interface{}, len(m.query.columns))
-// 	var i int
-// 	for rows.Next() {
-// 		row := make([]interface{}, len(m.query.columns))
-// 		for i := range m.query.columns {
-// 			row[i] = &Scanner{}
-// 		}
-
-// 		if err := rows.Scan(row...); err != nil {
-// 			return err
-// 		}
-
-// 		for i, column := range m.query.columns {
-// 			scanner := row[i].(*Scanner)
-// 			result[column] = scanner.value
-// 		}
-
-// 		scanStruct(s, result, i)
-// 	}
-
-// 	return nil
-// }

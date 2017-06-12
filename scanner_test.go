@@ -26,7 +26,7 @@ func Test_Scan(t *testing.T) {
 	}{
 		{
 			value:    int(7),
-			expected: int64(7),
+			expected: int(7),
 		},
 		{
 			value:    []uint8("test"),
@@ -234,6 +234,7 @@ func Test_ScanStructSlice(t *testing.T) {
 				},
 			},
 			expectedErr: true,
+			expected:    2,
 		},
 		{
 			sqlResults:  []map[string]interface{}{},
@@ -242,14 +243,9 @@ func Test_ScanStructSlice(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		err := scanStructSlice(&tc.testStruct, tc.sqlResults)
-		if tc.expectedErr {
-			require.NotNil(err)
-		} else {
-			require.Nil(err)
-			require.Equal(tc.expected, len(tc.testStruct))
-
-			for i, r := range tc.sqlResults {
+		for i, r := range tc.sqlResults {
+			err := scanStructSlice(&tc.testStruct, r)
+			if err == nil {
 				require.Equal(r["id"].(int), tc.testStruct[i].ID)
 				require.Equal(r["name"].(string), tc.testStruct[i].Name)
 				require.Equal(r["total"].(float64), tc.testStruct[i].Total)
@@ -260,11 +256,12 @@ func Test_ScanStructSlice(t *testing.T) {
 				}
 			}
 		}
+		require.Equal(tc.expected, len(tc.testStruct))
 	}
 
-	var validMap = []map[string]interface{}{{"id": 1}}
+	var validMap = map[string]interface{}{"id": 1}
 
-	err := scanStructSlice([]scanTest{}, []map[string]interface{}{})
+	err := scanStructSlice([]scanTest{}, map[string]interface{}{})
 	require.NotNil(err)
 
 	var ptrTest []*scanTest
