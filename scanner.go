@@ -28,6 +28,7 @@ func (a *all) scan(s interface{}, vals map[string]interface{}) error {
 	return scanStructSlice(s, vals)
 }
 
+// Scan set the value and check if we need to convert it
 func (sc *scanner) Scan(val interface{}) error {
 	switch val.(type) {
 	case []byte:
@@ -55,13 +56,10 @@ func scanStruct(s interface{}, vals map[string]interface{}) error {
 	}
 
 	for i := 0; i < valOf.Type().NumField(); i++ {
-		// Get the field
 		field := valOf.Field(i)
-
-		// Get the tags associated with the field
 		tag := valOf.Type().Field(i).Tag.Get(scannerTag)
+		// Skip empty tags
 		if len(strings.TrimSpace(tag)) == 0 {
-			// Skip empty tags
 			continue
 		}
 		fieldName := valOf.Type().Field(i).Name
@@ -70,12 +68,8 @@ func scanStruct(s interface{}, vals map[string]interface{}) error {
 			return fmt.Errorf("Can't set the value for field: %s", fieldName)
 		}
 
+		// Check if the tag exists
 		if val := vals[tag]; val != nil {
-			// fmt.Println(reflect.TypeOf(val).String())
-			// if field.Type() != reflect.TypeOf(val) {
-			// 	return fmt.Errorf("The field %s and the value are not of the same type", fieldName)
-			// }
-
 			if err := setFieldValue(field, val); err != nil {
 				return fmt.Errorf("Field %s: %s", fieldName, err)
 			}
@@ -85,11 +79,13 @@ func scanStruct(s interface{}, vals map[string]interface{}) error {
 	return nil
 }
 
+// Set the value depending on the field type
 func setFieldValue(field reflect.Value, v interface{}) error {
 	switch field.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		val, ok := v.(int64)
 		if !ok {
+			// Try again to cast to int64
 			if intVal, ok := v.(int); ok {
 				val = int64(intVal)
 			} else {
@@ -149,4 +145,36 @@ func scanStructSlice(s interface{}, vals map[string]interface{}) error {
 	valOf.Set(reflect.Append(valOf, ptrVal))
 
 	return nil
+}
+
+func getStructValues(s interface{}) ([]string, []interface{}, error) {
+	valOf := reflect.Indirect(reflect.ValueOf(s))
+	if valOf.Kind() != reflect.Struct {
+		return nil, nil, fmt.Errorf("The provided interface is not a struct")
+	}
+
+	var (
+		cols []string
+		args []interface{}
+	)
+	for i := 0; i < valOf.Type().NumField(); i++ {
+		value := valOf.Field(i).Interface()
+		tag := valOf.Type().Field(i).Tag.Get(scannerTag)
+		// Skip empty tags
+		if len(strings.TrimSpace(tag)) == 0 {
+			continue
+		}
+
+		if !isZero(value) {
+			args = append(args, value)
+			cols = append(cols, tag)
+		}
+	}
+
+	return cols, args, nil
+}
+
+// Check if the underlying type of the value is zero
+func isZero(v interface{}) bool {
+	return reflect.DeepEqual(v, reflect.Zero(reflect.TypeOf(v)).Interface())
 }

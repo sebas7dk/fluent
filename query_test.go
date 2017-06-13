@@ -70,6 +70,41 @@ func Test_Where(t *testing.T) {
 	}
 }
 
+func Test_WhereNull(t *testing.T) {
+	require := require.New(t)
+
+	f := &Fluent{}
+
+	tests := []struct {
+		whereNull    [][]interface{}
+		expectedStmt string
+	}{
+		{
+			whereNull: [][]interface{}{
+				{"created_at", true},
+			},
+			expectedStmt: " WHERE created_at IS NULL",
+		},
+		{
+			whereNull:    [][]interface{}{},
+			expectedStmt: "",
+		},
+	}
+
+	for _, tc := range tests {
+		f.query = newQuery()
+
+		for _, where := range tc.whereNull {
+			f.WhereNull(where[0].(string), where[1].(bool))
+		}
+
+		require.Equal(len(tc.whereNull), len(f.query.whereNull))
+
+		f.query.buildquery(setWhereNull())
+		require.Equal(tc.expectedStmt, f.query.stmt)
+	}
+}
+
 func Test_Join(t *testing.T) {
 	require := require.New(t)
 
@@ -83,15 +118,11 @@ func Test_Join(t *testing.T) {
 			join:         []string{"test", "user.id", "test.user_id"},
 			expectedStmt: " INNER JOIN test ON user.id = test.user_id",
 		},
-		{
-			join:         []string{"test", "user.id"},
-			expectedStmt: "",
-		},
 	}
 
 	for _, tc := range tests {
 		f.query = newQuery()
-		f.Join(tc.join)
+		f.Join(tc.join[0], tc.join[1], tc.join[2])
 
 		f.query.buildquery(setJoin())
 		require.Equal(tc.expectedStmt, f.query.stmt)
@@ -111,15 +142,11 @@ func Test_LeftJoin(t *testing.T) {
 			leftJoin:     []string{"test", "user.id", "test.user_id"},
 			expectedStmt: " LEFT JOIN test ON user.id = test.user_id",
 		},
-		{
-			leftJoin:     []string{"test", "user.id"},
-			expectedStmt: "",
-		},
 	}
 
 	for _, tc := range tests {
 		f.query = newQuery()
-		f.LeftJoin(tc.leftJoin)
+		f.LeftJoin(tc.leftJoin[0], tc.leftJoin[1], tc.leftJoin[2])
 
 		f.query.buildquery(setLeftJoin())
 		require.Equal(tc.expectedStmt, f.query.stmt)
@@ -335,28 +362,25 @@ func Test_Update(t *testing.T) {
 
 	tests := []struct {
 		table              string
-		values             map[string]interface{}
+		cols               []string
+		args               []interface{}
 		where              []interface{}
 		expectedStmt       string
 		expectedArgs       []interface{}
 		expectedArgCounter int
 	}{
 		{
-			table: "test",
-			values: map[string]interface{}{
-				"name":  "gerarld",
-				"total": 12.00,
-			},
+			table:              "test",
+			cols:               []string{"name", "total"},
+			args:               []interface{}{"gerald", 12.00},
 			expectedArgs:       []interface{}{"gerald", 12.00},
 			expectedStmt:       "UPDATE test SET name = $1, total = $2",
 			expectedArgCounter: 3,
 		},
 		{
-			table: "test",
-			values: map[string]interface{}{
-				"name":  "gerarld",
-				"total": 12.00,
-			},
+			table:              "test",
+			cols:               []string{"name", "total"},
+			args:               []interface{}{"gerald", 12.00},
 			where:              []interface{}{"id", "=", 1},
 			expectedArgs:       []interface{}{"gerald", 12.00, 1},
 			expectedStmt:       "UPDATE test SET name = $1, total = $2 WHERE id = $3",
@@ -373,7 +397,7 @@ func Test_Update(t *testing.T) {
 		}
 
 		f.query.buildquery(
-			setUpdate(tc.values),
+			setUpdate(tc.cols, tc.args),
 			setWhere(),
 		)
 

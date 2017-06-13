@@ -2,38 +2,46 @@ package fluent
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
 const (
-	selectStatement   = "SELECT %s FROM %s"
-	insertStatement   = "INSERT INTO %s (%s) VALUES (%s)"
-	updateStatement   = "UPDATE %s SET"
-	joinStatement     = " INNER JOIN %s ON %s = %s"
-	leftJoinStatement = " LEFT JOIN %s ON %s = %s"
-	andStatement      = " AND %s %s $%d"
-	whereStatement    = " WHERE %s %s $%d"
-	groupByStatement  = " GROUP BY %s"
-	orderByStatement  = " ORDER BY %s"
-	limitStatement    = " LIMIT $%d"
-	offsetStatement   = " OFFSET $%d"
+	selectStatement    = "SELECT %s FROM %s"
+	insertStatement    = "INSERT INTO %s (%s) VALUES (%s)"
+	updateStatement    = "UPDATE %s SET"
+	joinStatement      = " INNER JOIN %s ON %s = %s"
+	leftJoinStatement  = " LEFT JOIN %s ON %s = %s"
+	whereStatement     = " %s %s %s $%d"
+	whereNullStatement = " %s %s %s"
+	groupByStatement   = " GROUP BY %s"
+	orderByStatement   = " ORDER BY %s"
+	limitStatement     = " LIMIT $%d"
+	offsetStatement    = " OFFSET $%d"
 )
 
 type query struct {
 	stmt             string
 	columns          []string
 	table            string
-	join, leftJoin   []string
-	where            [][]interface{}
+	join, leftJoin   []interface{}
+	where, whereNull [][]interface{}
 	orderBy, groupBy []string
 	limit, offset    int
 	args             []interface{}
 	argCounter       int
+	debug            bool
 }
 
 func newQuery() *query {
 	return &query{
 		argCounter: 1,
+	}
+}
+
+func (q *query) log() {
+	if q.debug {
+		log.Println(q.stmt)
 	}
 }
 
@@ -59,15 +67,12 @@ func setInsert(cols []string, args []interface{}) queryOption {
 	}
 }
 
-func setUpdate(values map[string]interface{}) queryOption {
+func setUpdate(cols []string, args []interface{}) queryOption {
 	return func(q *query) {
-		for col, arg := range values {
-			q.columns = append(q.columns, col)
-			q.args = append(q.args, arg)
-		}
+		q.columns = cols
+		q.args = args
 
 		stmt := fmt.Sprintf(updateStatement, q.table)
-
 		for _, col := range q.columns {
 			stmt += fmt.Sprintf(" %s = $%d,", col, q.argCounter)
 			q.argCounter++
@@ -101,13 +106,43 @@ func setWhere() queryOption {
 
 			q.args = append(q.args, arg)
 
-			stmtType = whereStatement
+			stmtType = "WHERE"
 			if strings.Contains(q.stmt, "WHERE") {
-				stmtType = andStatement
+				stmtType = "AND"
 			}
 
-			q.stmt += fmt.Sprintf(stmtType, column, operator, q.argCounter)
+			q.stmt += fmt.Sprintf(whereStatement, stmtType, column, operator, q.argCounter)
 			q.argCounter++
+		}
+	}
+}
+
+func setWhereNull() queryOption {
+	return func(q *query) {
+		if len(q.whereNull) == 0 {
+			return
+		}
+
+		var stmtType string
+		for _, where := range q.whereNull {
+			if len(where) != 2 {
+				continue
+			}
+
+			col := where[0].(string)
+			isNull := where[1].(bool)
+
+			stmtType = "WHERE"
+			if strings.Contains(q.stmt, "WHERE") {
+				stmtType = "AND"
+			}
+
+			var nullStmt = "IS NOT NULL"
+			if isNull {
+				nullStmt = "IS NULL"
+			}
+
+			q.stmt += fmt.Sprintf(whereNullStatement, stmtType, col, nullStmt)
 		}
 	}
 }

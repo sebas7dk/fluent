@@ -7,3 +7,6 @@ test_postgres: start_postgres
 start_postgres:
 	docker-compose up -d --build fluent-postgres-db
 	sleep 10
+
+stop_postgres:
+	docker rm -f fluent-postgres-db

@@ -276,3 +276,46 @@ func Test_ScanStructSlice(t *testing.T) {
 	err = scanStructSlice(nilTest, validMap)
 	require.NotNil(err)
 }
+
+func Test_GetStructValues(t *testing.T) {
+	require := require.New(t)
+
+	timestamp := time.Now()
+
+	tests := []struct {
+		testStruct   scanTest
+		expectedCols []string
+		expectedArgs []interface{}
+	}{
+		{
+			testStruct: scanTest{
+				Name: "gerald",
+			},
+			expectedCols: []string{"name"},
+			expectedArgs: []interface{}{"gerald"},
+		},
+		{
+			testStruct: scanTest{
+				ID:        1,
+				Name:      "gerald",
+				Total:     12.00,
+				CreatedAt: timestamp,
+			},
+			expectedCols: []string{"id", "name", "total", "created_at"},
+			expectedArgs: []interface{}{1, "gerald", 12.00, timestamp},
+		},
+		{
+			expectedCols: []string{},
+			expectedArgs: []interface{}{},
+		},
+	}
+
+	for _, tc := range tests {
+		cols, args, _ := getStructValues(tc.testStruct)
+
+		for i, col := range cols {
+			require.Equal(tc.expectedCols[i], col)
+			require.Equal(tc.expectedArgs[i], args[i])
+		}
+	}
+}
