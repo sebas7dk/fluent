@@ -16,7 +16,7 @@ type test1 struct {
 	ID        int       `sql:"id"`
 	Name      string    `sql:"name"`
 	Total     float64   `sql:"total"`
-	UpdatedAt time.Time `sql:"created_at"`
+	UpdatedAt time.Time `sql:"deleted_at"`
 }
 
 type test2 struct {
@@ -93,6 +93,25 @@ func Test_Postgres(t *testing.T) {
 		}
 	})
 
+	t.Run("Update a single record in table test 1", func(t *testing.T) {
+		require := require.New(t)
+
+		update := test1{
+			UpdatedAt: time.Now(),
+		}
+		if err := f.Table("test_1").Where("id", "=", 1).Update(update); err != nil {
+			t.Fatal(err)
+		}
+
+		get := test1{}
+		err := f.Table("test_1").WhereNull("updated_at", false).Get([]string{"*"}).One(&get)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		require.NotNil(get)
+	})
+
 	t.Run("Get a single records from table test 1", func(t *testing.T) {
 		require := require.New(t)
 
@@ -115,11 +134,10 @@ func Test_Postgres(t *testing.T) {
 
 		tests := []test1{}
 
-		err := f.Debug(true).Table("test_1").Limit(10).Get([]string{"*"}).All(&tests)
+		err := f.Debug(true).Table("test_1").Limit(10).Get([]string{"id", "name", "total"}).All(&tests)
 		if err != nil {
 			t.Fatal(err)
 		}
-
 		for i, test := range tests {
 			i++
 			require.Equal(i, test.ID)

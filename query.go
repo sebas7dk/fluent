@@ -41,7 +41,7 @@ func newQuery() *query {
 
 func (q *query) log() {
 	if q.debug {
-		log.Println(q.stmt)
+		log.Println(q.stmt, q.args)
 	}
 }
 
