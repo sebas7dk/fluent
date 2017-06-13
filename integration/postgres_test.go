@@ -134,7 +134,7 @@ func Test_Postgres(t *testing.T) {
 
 		tests := []test1{}
 
-		err := f.Debug(true).Table("test_1").Limit(10).Get([]string{"id", "name", "total"}).All(&tests)
+		err := f.Debug(true).Table("test_1").OrderBy([]string{"id"}).Limit(10).Get([]string{"id", "name", "total"}).All(&tests)
 		if err != nil {
 			t.Fatal(err)
 		}
