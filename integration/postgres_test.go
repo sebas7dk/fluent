@@ -32,7 +32,7 @@ type joinboth struct {
 	IsActive int     `sql:"is_active"`
 }
 
-func connect() (fluent.ORM, error) {
+func connect() (fluent.Mapper, error) {
 	connStr := fmt.Sprintf(
 		"postgresql://%s:%s@%s:%d/%s?sslmode=disable",
 		"fluent",
@@ -66,7 +66,6 @@ func Test_Postgres(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-
 	})
 
 	t.Run("Insert records in table test 2", func(t *testing.T) {
@@ -118,7 +117,6 @@ func Test_Postgres(t *testing.T) {
 
 		for i := 1; i <= 10; i++ {
 			test := test1{}
-
 			err := f.Table("test_1").Where("id", "=", i).Get([]string{"id", "name", "total"}).One(&test)
 			if err != nil {
 				t.Fatal(err)
@@ -134,7 +132,6 @@ func Test_Postgres(t *testing.T) {
 		require := require.New(t)
 
 		tests := []test1{}
-
 		err := f.Table("test_1").OrderBy([]string{"id"}).Limit(10).Get([]string{"id", "name", "total"}).All(&tests)
 		if err != nil {
 			t.Fatal(err)
@@ -150,9 +147,9 @@ func Test_Postgres(t *testing.T) {
 	t.Run("Join both test tables", func(t *testing.T) {
 		require := require.New(t)
 
-		var id = 1
-
 		test := joinboth{}
+
+		var id = 1
 		err := f.Table("test_1 as t1").
 			Join("test_2 as t2", "t2.test_id", "t1.id").
 			Where("t1.id", "=", id).

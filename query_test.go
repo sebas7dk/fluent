@@ -299,22 +299,23 @@ func Test_BuildSelect(t *testing.T) {
 	for _, tc := range tests {
 		f.query = newQuery()
 
-		f = f.Table(tc.table).
-			GroupBy(tc.groupBy).
-			OrderBy(tc.orderBy)
+		f.query.builder(
+			setTable(tc.table),
+			setGroupBy(tc.groupBy),
+			setOrderBy(tc.orderBy),
+			setOffset(tc.offset),
+			setLimit(tc.limit),
+		)
 
 		if tc.where != nil {
-			f.Where(tc.where[0].(string), tc.where[1].(string), tc.where[2])
+			f.query.builder(setWhere(tc.where))
 		}
 
-		f.Offset(tc.offset).
-			Limit(tc.limit).
-			Get(tc.cols)
+		f.Get(tc.cols)
 
 		require.Equal(tc.expectedStmt, f.query.stmt)
 		require.Equal(tc.expectedArgs, f.query.args)
 		require.Equal(tc.expectedArgCounter, f.query.argCounter)
-
 	}
 }
 
@@ -346,8 +347,8 @@ func Test_Insert(t *testing.T) {
 	for _, tc := range tests {
 		f.query = newQuery()
 
-		f = f.Table(tc.table)
 		f.query.builder(
+			setTable(tc.table),
 			buildInsert(tc.cols, tc.args),
 		)
 
@@ -391,12 +392,12 @@ func Test_Update(t *testing.T) {
 	for _, tc := range tests {
 		f.query = newQuery()
 
-		f = f.Table(tc.table)
 		if tc.where != nil {
-			f.Where(tc.where[0].(string), tc.where[1].(string), tc.where[2])
+			f.query.builder(setWhere(tc.where))
 		}
 
 		f.query.builder(
+			setTable(tc.table),
 			buildUpdate(tc.cols, tc.args),
 			buildWhere(),
 		)
