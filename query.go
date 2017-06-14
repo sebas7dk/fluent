@@ -4,9 +4,15 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 )
 
 const (
+	whereClause        = "WHERE"
+	andClause          = "AND"
+	orClause           = "OR"
+	isNullClause       = "IS NULL"
+	isNotNullClause    = "IS NOT NULL"
 	selectStatement    = "SELECT %s FROM %s"
 	insertStatement    = "INSERT INTO %s (%s) VALUES (%s)"
 	updateStatement    = "UPDATE %s SET"
@@ -24,18 +30,20 @@ type query struct {
 	stmt             string
 	columns          []string
 	table            string
-	join, leftJoin   []interface{}
+	join, leftJoin   [][]interface{}
 	where, whereNull [][]interface{}
 	orderBy, groupBy []string
 	limit, offset    int
 	args             []interface{}
 	argCounter       int
 	debug            bool
+	mutex            *sync.RWMutex
 }
 
 func newQuery() *query {
 	return &query{
 		argCounter: 1,
+		mutex:      &sync.RWMutex{},
 	}
 }
 
@@ -47,13 +55,16 @@ func (q *query) log() {
 
 type queryOption func(q *query)
 
-func (q *query) buildquery(options ...queryOption) {
+func (q *query) builder(options ...queryOption) {
+	q.mutex.Lock()
+	defer q.mutex.Unlock()
+
 	for _, option := range options {
 		option(q)
 	}
 }
 
-func setInsert(cols []string, args []interface{}) queryOption {
+func buildInsert(cols []string, args []interface{}) queryOption {
 	return func(q *query) {
 		q.columns = cols
 		q.args = args
@@ -67,7 +78,7 @@ func setInsert(cols []string, args []interface{}) queryOption {
 	}
 }
 
-func setUpdate(cols []string, args []interface{}) queryOption {
+func buildUpdate(cols []string, args []interface{}) queryOption {
 	return func(q *query) {
 		q.columns = cols
 		q.args = args
@@ -82,13 +93,13 @@ func setUpdate(cols []string, args []interface{}) queryOption {
 	}
 }
 
-func setSelect() queryOption {
+func buildSelect() queryOption {
 	return func(q *query) {
 		q.stmt = fmt.Sprintf(selectStatement, strings.Join(q.columns, ","), q.table)
 	}
 }
 
-func setWhere() queryOption {
+func buildWhere() queryOption {
 	return func(q *query) {
 		if len(q.where) == 0 {
 			return
@@ -106,9 +117,9 @@ func setWhere() queryOption {
 
 			q.args = append(q.args, arg)
 
-			stmtType = "WHERE"
-			if strings.Contains(q.stmt, "WHERE") {
-				stmtType = "AND"
+			stmtType = whereClause
+			if strings.Contains(q.stmt, whereClause) {
+				stmtType = andClause
 			}
 
 			q.stmt += fmt.Sprintf(whereStatement, stmtType, column, operator, q.argCounter)
@@ -117,7 +128,7 @@ func setWhere() queryOption {
 	}
 }
 
-func setWhereNull() queryOption {
+func buildWhereNull() queryOption {
 	return func(q *query) {
 		if len(q.whereNull) == 0 {
 			return
@@ -132,14 +143,14 @@ func setWhereNull() queryOption {
 			col := where[0].(string)
 			isNull := where[1].(bool)
 
-			stmtType = "WHERE"
-			if strings.Contains(q.stmt, "WHERE") {
-				stmtType = "AND"
+			stmtType = whereClause
+			if strings.Contains(q.stmt, whereClause) {
+				stmtType = andClause
 			}
 
-			var nullStmt = "IS NOT NULL"
+			var nullStmt = isNotNullClause
 			if isNull {
-				nullStmt = "IS NULL"
+				nullStmt = isNullClause
 			}
 
 			q.stmt += fmt.Sprintf(whereNullStatement, stmtType, col, nullStmt)
@@ -147,23 +158,27 @@ func setWhereNull() queryOption {
 	}
 }
 
-func setJoin() queryOption {
+func buildJoin() queryOption {
 	return func(q *query) {
-		if q.join != nil && len(q.join) == 3 {
-			q.stmt += fmt.Sprintf(joinStatement, q.join[0], q.join[1], q.join[2])
+		for _, join := range q.join {
+			if join != nil && len(join) == 3 {
+				q.stmt += fmt.Sprintf(joinStatement, join[0], join[1], join[2])
+			}
 		}
 	}
 }
 
-func setLeftJoin() queryOption {
+func buildLeftJoin() queryOption {
 	return func(q *query) {
-		if q.leftJoin != nil && len(q.leftJoin) == 3 {
-			q.stmt += fmt.Sprintf(leftJoinStatement, q.leftJoin[0], q.leftJoin[1], q.leftJoin[2])
+		for _, join := range q.leftJoin {
+			if join != nil && len(join) == 3 {
+				q.stmt += fmt.Sprintf(leftJoinStatement, join[0], join[1], join[2])
+			}
 		}
 	}
 }
 
-func setGroupBy() queryOption {
+func buildGroupBy() queryOption {
 	return func(q *query) {
 		if q.groupBy != nil {
 			q.stmt += fmt.Sprintf(groupByStatement, strings.Join(q.groupBy, ","))
@@ -171,7 +186,7 @@ func setGroupBy() queryOption {
 	}
 }
 
-func setOrderBy() queryOption {
+func buildOrderBy() queryOption {
 	return func(q *query) {
 		if q.orderBy != nil {
 			q.stmt += fmt.Sprintf(orderByStatement, strings.Join(q.orderBy, ","))
@@ -179,7 +194,7 @@ func setOrderBy() queryOption {
 	}
 }
 
-func setLimit() queryOption {
+func buildLimit() queryOption {
 	return func(q *query) {
 		if q.limit > 0 {
 			q.args = append(q.args, q.limit)
@@ -189,10 +204,76 @@ func setLimit() queryOption {
 	}
 }
 
-func setOffest() queryOption {
+func buildOffset() queryOption {
 	return func(q *query) {
 		q.args = append(q.args, q.offset)
 		q.stmt += fmt.Sprintf(offsetStatement, q.argCounter)
 		q.argCounter++
+	}
+}
+
+func setDebug(s bool) queryOption {
+	return func(q *query) {
+		q.debug = s
+	}
+}
+
+func setTable(t string) queryOption {
+	return func(q *query) {
+		q.table = t
+	}
+}
+
+func setColumns(c []string) queryOption {
+	return func(q *query) {
+		q.columns = c
+	}
+}
+
+func setWhere(w []interface{}) queryOption {
+	return func(q *query) {
+		q.where = append(q.where, w)
+	}
+}
+
+func setWhereNull(wn []interface{}) queryOption {
+	return func(q *query) {
+		q.whereNull = append(q.whereNull, wn)
+	}
+}
+
+func setJoin(j []interface{}) queryOption {
+	return func(q *query) {
+		q.join = append(q.join, j)
+	}
+}
+
+func setLeftJoin(lj []interface{}) queryOption {
+	return func(q *query) {
+		q.leftJoin = append(q.leftJoin, lj)
+	}
+}
+
+func setGroupBy(gb []string) queryOption {
+	return func(q *query) {
+		q.groupBy = gb
+	}
+}
+
+func setOrderBy(ob []string) queryOption {
+	return func(q *query) {
+		q.orderBy = ob
+	}
+}
+
+func setLimit(l int) queryOption {
+	return func(q *query) {
+		q.limit = l
+	}
+}
+
+func setOffset(o int) queryOption {
+	return func(q *query) {
+		q.offset = o
 	}
 }

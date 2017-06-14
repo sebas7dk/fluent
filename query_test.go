@@ -63,7 +63,7 @@ func Test_Where(t *testing.T) {
 
 		require.Equal(len(tc.where), len(f.query.where))
 
-		f.query.buildquery(setWhere())
+		f.query.builder(buildWhere())
 		require.Equal(tc.expectedStmt, f.query.stmt)
 		require.Equal(tc.expectedArgs, f.query.args)
 		require.Equal(tc.expectedArgCounter, f.query.argCounter)
@@ -100,7 +100,7 @@ func Test_WhereNull(t *testing.T) {
 
 		require.Equal(len(tc.whereNull), len(f.query.whereNull))
 
-		f.query.buildquery(setWhereNull())
+		f.query.builder(buildWhereNull())
 		require.Equal(tc.expectedStmt, f.query.stmt)
 	}
 }
@@ -124,7 +124,7 @@ func Test_Join(t *testing.T) {
 		f.query = newQuery()
 		f.Join(tc.join[0], tc.join[1], tc.join[2])
 
-		f.query.buildquery(setJoin())
+		f.query.builder(buildJoin())
 		require.Equal(tc.expectedStmt, f.query.stmt)
 	}
 }
@@ -148,7 +148,7 @@ func Test_LeftJoin(t *testing.T) {
 		f.query = newQuery()
 		f.LeftJoin(tc.leftJoin[0], tc.leftJoin[1], tc.leftJoin[2])
 
-		f.query.buildquery(setLeftJoin())
+		f.query.builder(buildLeftJoin())
 		require.Equal(tc.expectedStmt, f.query.stmt)
 	}
 }
@@ -176,7 +176,7 @@ func Test_OrderBy(t *testing.T) {
 		f.query = newQuery()
 		f.OrderBy(tc.orderBy)
 
-		f.query.buildquery(setOrderBy())
+		f.query.builder(buildOrderBy())
 		require.Equal(tc.expectedStmt, f.query.stmt)
 	}
 }
@@ -204,7 +204,7 @@ func Test_GroupBy(t *testing.T) {
 		f.query = newQuery()
 		f.GroupBy(tc.groupBy)
 
-		f.query.buildquery(setGroupBy())
+		f.query.builder(buildGroupBy())
 		require.Equal(tc.expectedStmt, f.query.stmt)
 	}
 }
@@ -237,7 +237,7 @@ func Test_Limit(t *testing.T) {
 		f.query = newQuery()
 		f.Limit(tc.limit)
 
-		f.query.buildquery(setLimit())
+		f.query.builder(buildLimit())
 		require.Equal(tc.expectedStmt, f.query.stmt)
 		// require.Equal(tc.expectedArgs, f.query.args)
 		require.Equal(tc.expectedArgCounter, f.query.argCounter)
@@ -299,7 +299,7 @@ func Test_BuildSelect(t *testing.T) {
 	for _, tc := range tests {
 		f.query = newQuery()
 
-		f.Table(tc.table).
+		f = f.Table(tc.table).
 			GroupBy(tc.groupBy).
 			OrderBy(tc.orderBy)
 
@@ -346,9 +346,9 @@ func Test_Insert(t *testing.T) {
 	for _, tc := range tests {
 		f.query = newQuery()
 
-		f.Table(tc.table)
-		f.query.buildquery(
-			setInsert(tc.cols, tc.args),
+		f = f.Table(tc.table)
+		f.query.builder(
+			buildInsert(tc.cols, tc.args),
 		)
 
 		require.Equal(tc.expectedStmt, f.query.stmt)
@@ -391,14 +391,14 @@ func Test_Update(t *testing.T) {
 	for _, tc := range tests {
 		f.query = newQuery()
 
-		f.Table(tc.table)
+		f = f.Table(tc.table)
 		if tc.where != nil {
 			f.Where(tc.where[0].(string), tc.where[1].(string), tc.where[2])
 		}
 
-		f.query.buildquery(
-			setUpdate(tc.cols, tc.args),
-			setWhere(),
+		f.query.builder(
+			buildUpdate(tc.cols, tc.args),
+			buildWhere(),
 		)
 
 		require.Equal(tc.expectedStmt, f.query.stmt)

@@ -33,82 +33,89 @@ func New(db *sql.DB) ORM {
 	return &Fluent{db, newQuery()}
 }
 
+func (f *Fluent) clone() *Fluent {
+	return &Fluent{f.db, newQuery()}
+}
+
+// Debug if set to true it will log the query
+func (f *Fluent) Debug(status bool) *Fluent {
+	f.query.builder(setDebug(status))
+	return f
+}
+
 // Table add the table name to the query
 func (f *Fluent) Table(table string) *Fluent {
-	f.query.table = table
+	f = f.clone()
+	f.query.builder(setTable(table))
 	return f
 }
 
 // Join add the table and columns to the query
 func (f *Fluent) Join(table, column1, column2 string) *Fluent {
-	f.query.join = []interface{}{table, column1, column2}
+	join := []interface{}{table, column1, column2}
+	f.query.builder(setJoin(join))
 	return f
 }
 
 // LeftJoin add the table and columns to the query
 func (f *Fluent) LeftJoin(table, column1, column2 string) *Fluent {
-	f.query.leftJoin = []interface{}{table, column1, column2}
+	join := []interface{}{table, column1, column2}
+	f.query.builder(setLeftJoin(join))
 	return f
 }
 
 // Where add the column, operator and the value to the query
 func (f *Fluent) Where(column, operator string, value interface{}) *Fluent {
 	where := []interface{}{column, operator, value}
-	f.query.where = append(f.query.where, where)
+	f.query.builder(setWhere(where))
 	return f
 }
 
 // WhereNull add the null or not null column to the query
 func (f *Fluent) WhereNull(column string, isNull bool) *Fluent {
 	where := []interface{}{column, isNull}
-	f.query.whereNull = append(f.query.whereNull, where)
+	f.query.builder(setWhereNull(where))
 	return f
 }
 
 // OrderBy add the order by columns tot the query
 func (f *Fluent) OrderBy(columns []string) *Fluent {
-	f.query.orderBy = columns
+	f.query.builder(setOrderBy(columns))
 	return f
 }
 
 // GroupBy add the group by columns tot the query
 func (f *Fluent) GroupBy(columns []string) *Fluent {
-	f.query.groupBy = columns
+	f.query.builder(setGroupBy(columns))
 	return f
 }
 
 // Limit add the limit to the query
 func (f *Fluent) Limit(limit int) *Fluent {
-	f.query.limit = limit
+	f.query.builder(setLimit(limit))
 	return f
 }
 
 // Offset add the offset to the query
 func (f *Fluent) Offset(offset int) *Fluent {
-	f.query.offset = offset
+	f.query.builder(setOffset(offset))
 	return f
 }
 
 // Get add the columns to select from and build the query
 func (f *Fluent) Get(columns []string) *Fluent {
-	f.query.columns = columns
-	f.query.buildquery(
-		setSelect(),
-		setJoin(),
-		setLeftJoin(),
-		setGroupBy(),
-		setOrderBy(),
-		setWhere(),
-		setWhereNull(),
-		setOffest(),
-		setLimit(),
+	f.query.builder(
+		setColumns(columns),
+		buildSelect(),
+		buildJoin(),
+		buildLeftJoin(),
+		buildGroupBy(),
+		buildOrderBy(),
+		buildWhere(),
+		buildWhereNull(),
+		buildOffset(),
+		buildLimit(),
 	)
-	return f
-}
-
-// Debug if set to true it will log the query
-func (f *Fluent) Debug(status bool) *Fluent {
-	f.query.debug = status
 	return f
 }
 
@@ -120,7 +127,7 @@ func (f *Fluent) Insert(s interface{}) error {
 		return err
 	}
 
-	f.query.buildquery(setInsert(cols, args))
+	f.query.builder(buildInsert(cols, args))
 	return f.execute()
 }
 
@@ -132,10 +139,10 @@ func (f *Fluent) Update(s interface{}) error {
 		return err
 	}
 
-	f.query.buildquery(
-		setUpdate(cols, args),
-		setWhere(),
-		setWhereNull(),
+	f.query.builder(
+		buildUpdate(cols, args),
+		buildWhere(),
+		buildWhereNull(),
 	)
 
 	return f.execute()
@@ -161,7 +168,7 @@ func (f *Fluent) All(s interface{}) error {
 }
 
 func (f *Fluent) execute() error {
-	defer f.reset()
+	defer f.query.log()
 
 	prepare, err := f.db.Prepare(f.query.stmt)
 	if err != nil {
@@ -176,7 +183,7 @@ func (f *Fluent) execute() error {
 // scan prepares the statement and scans the values of each row
 // into the provided struct or slice
 func (f *Fluent) scan(s interface{}, st scannerType) error {
-	defer f.reset()
+	defer f.query.log()
 
 	prepare, err := f.db.Prepare(f.query.stmt)
 	if err != nil {
@@ -218,11 +225,4 @@ func (f *Fluent) scan(s interface{}, st scannerType) error {
 	}
 
 	return nil
-}
-
-// Reset the values from the query struct
-// and log the query if debug is set to true
-func (f *Fluent) reset() {
-	f.query.log()
-	f.query = newQuery()
 }

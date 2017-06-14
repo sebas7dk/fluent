@@ -3,6 +3,7 @@ package integration
 import (
 	"database/sql"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -87,7 +88,7 @@ func Test_Postgres(t *testing.T) {
 				IsActive: 1,
 			}
 
-			if err := f.Table("test_2").Where("id", "=", i).Update(test); err != nil {
+			if err := f.Debug(true).Table("test_2").Where("id", "=", i).Update(test); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -134,7 +135,7 @@ func Test_Postgres(t *testing.T) {
 
 		tests := []test1{}
 
-		err := f.Debug(true).Table("test_1").OrderBy([]string{"id"}).Limit(10).Get([]string{"id", "name", "total"}).All(&tests)
+		err := f.Table("test_1").OrderBy([]string{"id"}).Limit(10).Get([]string{"id", "name", "total"}).All(&tests)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -166,4 +167,56 @@ func Test_Postgres(t *testing.T) {
 		require.Equal(10.00+float64(id), test.Total)
 
 	})
+
+}
+
+func Test_Concurrency(t *testing.T) {
+	f, err := connect()
+	if err != nil {
+		t.Fatalf("Unable to connect to the database: %s", err)
+	}
+
+	wg := sync.WaitGroup{}
+	queryChan := make(chan int, 10)
+
+	for i := 1; i < 10; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			test := test1{
+				Name:  fmt.Sprintf("user_%d", i),
+				Total: 10.00 + float64(i),
+			}
+
+			if err := f.Table("test_1").Insert(test); err != nil {
+				t.Fatal(err)
+			}
+
+			queryChan <- i
+		}(i)
+	}
+	wg.Wait()
+	close(queryChan)
+
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for id := range queryChan {
+				require := require.New(t)
+
+				test := test1{}
+				err := f.Debug(true).Table("test_1").Where("id", "=", id).Get([]string{"id", "name", "total"}).One(&test)
+				if err != nil {
+					fmt.Println(err)
+				}
+
+				require.Equal(id, test.ID)
+				require.Equal(fmt.Sprintf("user_%d", id), test.Name)
+				require.Equal(10.00+float64(id), test.Total)
+			}
+		}()
+	}
+	wg.Wait()
 }
