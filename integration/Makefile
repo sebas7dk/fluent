@@ -1,6 +1,3 @@
-deps:
-	glide install
-
 test_postgres: start_postgres
 	go test -timeout=20s -race -v $$(glide novendor)
 

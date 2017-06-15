@@ -9,4 +9,4 @@ Fluent is an ORM for Golang.
 
 ## Quickstart
 
-See the docs on how to use the Fluent ORM.
+See the [docs](http://godoc.org/github.com/sebas7dk/fluent) on how to use the Fluent ORM.

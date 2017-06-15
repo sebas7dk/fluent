@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/sebas_dk/fluent"
-
 	_ "github.com/lib/pq" //postgres package
+	"github.com/sebas7dk/fluent"
 	"github.com/stretchr/testify/require"
 )
 
