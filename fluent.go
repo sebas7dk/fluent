@@ -13,25 +13,36 @@ type Fluent struct {
 // Mapper exposes the functionalities
 // to start building the query
 type Mapper interface {
-	Table(table string) ExtendedMapper
-	Raw(stmt string, args []interface{}) error
+	Table(table string) QueryMapper
+	GetDB() *sql.DB
 	Debug(status bool) Mapper
 }
 
-// ExtendedMapper exposes the functionalities
-// to build and execute the query
-type ExtendedMapper interface {
-	Join(table, column1, column2 string) ExtendedMapper
-	LeftJoin(table, column1, column2 string) ExtendedMapper
-	Where(column, operator string, value interface{}) ExtendedMapper
-	WhereNull(column string, isNull bool) ExtendedMapper
-	OrderBy(columns []string) ExtendedMapper
-	GroupBy(columns []string) ExtendedMapper
-	Limit(limit int) ExtendedMapper
-	Offset(offset int) ExtendedMapper
-	Get(columns []string) ExtendedMapper
+// QueryMapper exposes the functionalities
+// to build the query
+type QueryMapper interface {
+	Join(table, column1, column2 string) QueryMapper
+	LeftJoin(table, column1, column2 string) QueryMapper
+	Where(column, operator string, value interface{}) QueryMapper
+	WhereNull(column string, isNull bool) QueryMapper
+	OrderBy(columns []string) QueryMapper
+	GroupBy(columns []string) QueryMapper
+	Limit(limit int) QueryMapper
+	Offset(offset int) QueryMapper
+	Get(columns []string) ScanMapper
+	ExecuteMapper
+}
+
+// ScanMapper exposes the functionalities to
+// scan and fetch the rows
+type ScanMapper interface {
 	One(s interface{}) error
 	All(s interface{}) error
+}
+
+// ExecuteMapper exposes the functionalities
+// to execute the query
+type ExecuteMapper interface {
 	Insert(s interface{}) error
 	Update(s interface{}) error
 }
@@ -52,67 +63,72 @@ func (f *Fluent) Debug(status bool) Mapper {
 	return f
 }
 
+// GetDB returns the database connection
+func (f *Fluent) GetDB() *sql.DB {
+	return f.db
+}
+
 // Table set the table name
-func (f *Fluent) Table(table string) ExtendedMapper {
+func (f *Fluent) Table(table string) QueryMapper {
 	f = f.clone()
 	f.query.builder(setTable(table))
 	return f
 }
 
 // Join set the table and columns for the join query
-func (f *Fluent) Join(table, column1, column2 string) ExtendedMapper {
+func (f *Fluent) Join(table, column1, column2 string) QueryMapper {
 	join := []interface{}{table, column1, column2}
 	f.query.builder(setJoin(join))
 	return f
 }
 
 // LeftJoin set the table and columns for the left join query
-func (f *Fluent) LeftJoin(table, column1, column2 string) ExtendedMapper {
+func (f *Fluent) LeftJoin(table, column1, column2 string) QueryMapper {
 	join := []interface{}{table, column1, column2}
 	f.query.builder(setLeftJoin(join))
 	return f
 }
 
 // Where set the column, operator and the value for the where clause
-func (f *Fluent) Where(column, operator string, value interface{}) ExtendedMapper {
+func (f *Fluent) Where(column, operator string, value interface{}) QueryMapper {
 	where := []interface{}{column, operator, value}
 	f.query.builder(setWhere(where))
 	return f
 }
 
 // WhereNull set if the column is null or not null
-func (f *Fluent) WhereNull(column string, isNull bool) ExtendedMapper {
+func (f *Fluent) WhereNull(column string, isNull bool) QueryMapper {
 	where := []interface{}{column, isNull}
 	f.query.builder(setWhereNull(where))
 	return f
 }
 
 // OrderBy set to columns to order by
-func (f *Fluent) OrderBy(columns []string) ExtendedMapper {
+func (f *Fluent) OrderBy(columns []string) QueryMapper {
 	f.query.builder(setOrderBy(columns))
 	return f
 }
 
 // GroupBy set to columns to group by
-func (f *Fluent) GroupBy(columns []string) ExtendedMapper {
+func (f *Fluent) GroupBy(columns []string) QueryMapper {
 	f.query.builder(setGroupBy(columns))
 	return f
 }
 
 // Limit set the limit of records to return
-func (f *Fluent) Limit(limit int) ExtendedMapper {
+func (f *Fluent) Limit(limit int) QueryMapper {
 	f.query.builder(setLimit(limit))
 	return f
 }
 
 // Offset set the offset for the records to return
-func (f *Fluent) Offset(offset int) ExtendedMapper {
+func (f *Fluent) Offset(offset int) QueryMapper {
 	f.query.builder(setOffset(offset))
 	return f
 }
 
 // Get set the columns to select from and build the query
-func (f *Fluent) Get(columns []string) ExtendedMapper {
+func (f *Fluent) Get(columns []string) ScanMapper {
 	f.query.builder(
 		setColumns(columns),
 		buildSelect(),
@@ -154,13 +170,6 @@ func (f *Fluent) Update(s interface{}) error {
 		buildWhereNull(),
 	)
 
-	return f.execute()
-}
-
-// Raw set the statement and arguments and execute the query
-func (f *Fluent) Raw(stmt string, args []interface{}) error {
-	f.query.args = args
-	f.query.stmt = stmt
 	return f.execute()
 }
 
