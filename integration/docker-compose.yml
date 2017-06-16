@@ -1,0 +1,13 @@
+version: '2'
+services:
+
+  fluent-postgres-db:
+      image: postgres:9.5.3
+      container_name: fluent-postgres-db
+      environment:
+        - POSTGRES_USER=fluent
+        - POSTGRES_PASSWORD=fluent
+      volumes:
+        - ./schemas/postgres/setup.sql:/docker-entrypoint-initdb.d/database.sql
+      ports:
+        - 5432:5432
