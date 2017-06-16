@@ -1,5 +1,5 @@
 /*
-Package fluent is an ORM build around the database/sql package.
+Package fluent is an ORM build around the lib/pq package.
 
 Overview
 	- SQL builder
@@ -12,7 +12,7 @@ Before you can use the Fluent ORM you have to connect to a database, for example
 	import (
 		"database/sql"
 		_ "github.com/lib/pq"
-		bitbucket.org/sebas_dk/fluent
+		github.com/sebas7dk/fluent
 
 	)
 	func main() {
@@ -28,31 +28,31 @@ Before you can use the Fluent ORM you have to connect to a database, for example
 Query Builder
 
 The Fluent ORM uses the tags in the struct to find and set values.
-	type Test struct {
+	type Record struct {
 	    ID int       `sql:"id"`
 	    Name string  `sql:"name"`
 	    Total string `sql:"total"`
 	}
 
 Create Record
-  test := Test{Name: "user_1", Total: 12.00}
-  fluent.Table("test").Insert(test)
+  record := Record{Name: "user_1", Total: 12.00}
+  id, err := fluent.Table("test").Insert(record)
 
 Update Record
-  test := Test{Name: "user_2"}
-  fluent.Table("test").Where("id","=", 1).Update(test)
+  record := Record{Name: "user_2"}
+  err := fluent.Table("test").Where("id","=", 1).Update(record)
 
 Fetch Record
-  test := Test{}
-  fluent.Table("test").Where("id","=", 1).Get([]string("id","name","total").One(&test)
+  record := Record{}
+  err := fluent.Table("test").Where("id","=", 1).Get("id","name","total").One(&record)
 
-  fluent.Table("test").WhereNull("name", true).Get([]string("*").One(&test)
+  err = fluent.Table("test").GroupBy("id").WhereNull("name", true).Get("*").One(&record)
 
-  tests := []Test{}
-  fluent.Table("test").Get([]string("id","name", "total").All(&tests)
+  records := []Record{}
+  err = fluent.Table("test").Get("id","name", "total").All(&records)
 
 Join Records
-  test := Join{}
-  fluent.Table("test_1 as t2").Join("test_2 as t2", "t2.user_id", "t1.id").Get("t1.name").One(&test)
+  record := Record{}
+  err := fluent.Table("test_1 as t2").Join("test_2 as t2", "t2.user_id", "t1.id").Get("t1.name").One(&record)
 */
 package fluent

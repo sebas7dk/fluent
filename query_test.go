@@ -174,7 +174,7 @@ func Test_OrderBy(t *testing.T) {
 
 	for _, tc := range tests {
 		f.query = newQuery()
-		f.OrderBy(tc.orderBy)
+		f.OrderBy(tc.orderBy...)
 
 		f.query.builder(buildOrderBy())
 		require.Equal(tc.expectedStmt, f.query.stmt)
@@ -202,7 +202,7 @@ func Test_GroupBy(t *testing.T) {
 
 	for _, tc := range tests {
 		f.query = newQuery()
-		f.GroupBy(tc.groupBy)
+		f.GroupBy(tc.groupBy...)
 
 		f.query.builder(buildGroupBy())
 		require.Equal(tc.expectedStmt, f.query.stmt)
@@ -227,7 +227,6 @@ func Test_Limit(t *testing.T) {
 			expectedStmt:       " LIMIT $1",
 		},
 		{
-			expectedArgs:       []interface{}{},
 			expectedArgCounter: 1,
 			expectedStmt:       "",
 		},
@@ -239,7 +238,7 @@ func Test_Limit(t *testing.T) {
 
 		f.query.builder(buildLimit())
 		require.Equal(tc.expectedStmt, f.query.stmt)
-		// require.Equal(tc.expectedArgs, f.query.args)
+		require.Equal(tc.expectedArgs, f.query.args)
 		require.Equal(tc.expectedArgCounter, f.query.argCounter)
 	}
 }
@@ -311,7 +310,7 @@ func Test_BuildSelect(t *testing.T) {
 			f.query.builder(setWhere(tc.where))
 		}
 
-		f.Get(tc.cols)
+		f.Get(tc.cols...)
 
 		require.Equal(tc.expectedStmt, f.query.stmt)
 		require.Equal(tc.expectedArgs, f.query.args)
@@ -334,13 +333,13 @@ func Test_Insert(t *testing.T) {
 			table:        "test",
 			cols:         []string{"name", "total"},
 			args:         []interface{}{"gerald", 12.00},
-			expectedStmt: "INSERT INTO test (name,total) VALUES ($1,$2)",
+			expectedStmt: "INSERT INTO test (name,total) VALUES ($1,$2) RETURNING id",
 		},
 		{
 			table:        "test",
 			cols:         []string{"name", "total", "is_active"},
 			args:         []interface{}{"gerald", 12.00, 1},
-			expectedStmt: "INSERT INTO test (name,total,is_active) VALUES ($1,$2,$3)",
+			expectedStmt: "INSERT INTO test (name,total,is_active) VALUES ($1,$2,$3) RETURNING id",
 		},
 	}
 

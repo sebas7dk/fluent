@@ -25,11 +25,11 @@ type QueryMapper interface {
 	LeftJoin(table, column1, column2 string) QueryMapper
 	Where(column, operator string, value interface{}) QueryMapper
 	WhereNull(column string, isNull bool) QueryMapper
-	OrderBy(columns []string) QueryMapper
-	GroupBy(columns []string) QueryMapper
+	OrderBy(columns ...string) QueryMapper
+	GroupBy(columns ...string) QueryMapper
 	Limit(limit int) QueryMapper
 	Offset(offset int) QueryMapper
-	Get(columns []string) ScanMapper
+	Get(columns ...string) ScanMapper
 	ExecuteMapper
 }
 
@@ -43,7 +43,7 @@ type ScanMapper interface {
 // ExecuteMapper exposes the functionalities
 // to execute the query
 type ExecuteMapper interface {
-	Insert(s interface{}) error
+	Insert(s interface{}) (int, error)
 	Update(s interface{}) error
 }
 
@@ -104,13 +104,13 @@ func (f *Fluent) WhereNull(column string, isNull bool) QueryMapper {
 }
 
 // OrderBy set to columns to order by
-func (f *Fluent) OrderBy(columns []string) QueryMapper {
+func (f *Fluent) OrderBy(columns ...string) QueryMapper {
 	f.query.builder(setOrderBy(columns))
 	return f
 }
 
 // GroupBy set to columns to group by
-func (f *Fluent) GroupBy(columns []string) QueryMapper {
+func (f *Fluent) GroupBy(columns ...string) QueryMapper {
 	f.query.builder(setGroupBy(columns))
 	return f
 }
@@ -128,7 +128,7 @@ func (f *Fluent) Offset(offset int) QueryMapper {
 }
 
 // Get set the columns to select from and build the query
-func (f *Fluent) Get(columns []string) ScanMapper {
+func (f *Fluent) Get(columns ...string) ScanMapper {
 	f.query.builder(
 		setColumns(columns),
 		buildSelect(),
@@ -146,14 +146,14 @@ func (f *Fluent) Get(columns []string) ScanMapper {
 
 // Insert a record by building the query and scanning
 // the values from the struct to insert
-func (f *Fluent) Insert(s interface{}) error {
+func (f *Fluent) Insert(s interface{}) (int, error) {
 	cols, args, err := getStructValues(s)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	f.query.builder(buildInsert(cols, args))
-	return f.execute()
+	return f.queryRow()
 }
 
 // Update a record by building the query and scanning
@@ -196,6 +196,21 @@ func (f *Fluent) execute() error {
 
 	_, err = prepare.Exec(f.query.args...)
 	return err
+}
+
+// queryRow is used to return the last inserted id
+func (f *Fluent) queryRow() (int, error) {
+	defer f.query.log()
+
+	var id int
+	prepare, err := f.db.Prepare(f.query.stmt)
+	if err != nil {
+		return id, err
+	}
+	defer prepare.Close()
+
+	err = prepare.QueryRow(f.query.args...).Scan(&id)
+	return id, err
 }
 
 // scan prepares the statement and scans the values of each row

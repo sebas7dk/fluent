@@ -14,7 +14,7 @@ const (
 	isNullClause       = "IS NULL"
 	isNotNullClause    = "IS NOT NULL"
 	selectStatement    = "SELECT %s FROM %s"
-	insertStatement    = "INSERT INTO %s (%s) VALUES (%s)"
+	insertStatement    = "INSERT INTO %s (%s) VALUES (%s) RETURNING id"
 	updateStatement    = "UPDATE %s SET"
 	joinStatement      = " INNER JOIN %s ON %s = %s"
 	leftJoinStatement  = " LEFT JOIN %s ON %s = %s"
