@@ -57,6 +57,7 @@ func scanStruct(s interface{}, vals map[string]interface{}) error {
 
 	for i := 0; i < valOf.Type().NumField(); i++ {
 		field := valOf.Field(i)
+
 		tag := valOf.Type().Field(i).Tag.Get(scannerTag)
 		// Skip empty tags
 		if len(strings.TrimSpace(tag)) == 0 {
@@ -66,6 +67,15 @@ func scanStruct(s interface{}, vals map[string]interface{}) error {
 
 		if !field.CanSet() {
 			return fmt.Errorf("Can't set the value for field: %s", fieldName)
+		}
+
+		if field.Kind() == reflect.Ptr {
+			ptr := reflect.New(field.Type().Elem()).Interface()
+			if err := scanStruct(ptr, vals); err != nil {
+				return err
+			}
+
+			field.Set(reflect.ValueOf(ptr))
 		}
 
 		// Check if the tag exists

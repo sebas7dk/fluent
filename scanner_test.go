@@ -8,11 +8,16 @@ import (
 )
 
 type scanTest struct {
+	*Inherit  `sql:"inherit"`
 	ID        int       `sql:"id"`
 	Name      string    `sql:"name"`
 	Total     float64   `sql:"total"`
 	IsActive  bool      `sql:"is_active"`
 	CreatedAt time.Time `sql:"created_at"`
+}
+
+type Inherit struct {
+	RowCount int `sql:"row_count"`
 }
 
 func Test_Scan(t *testing.T) {
@@ -65,6 +70,7 @@ func Test_ScanStruct(t *testing.T) {
 				"total":      12.00,
 				"created_at": timestamp,
 				"is_active":  true,
+				"row_count":  2,
 			},
 			expectedErr: false,
 		},
@@ -75,6 +81,7 @@ func Test_ScanStruct(t *testing.T) {
 				"total":      12.00,
 				"created_at": timestamp,
 				"is_active":  true,
+				"row_count":  5,
 			},
 			expectedErr: false,
 		},
@@ -85,6 +92,7 @@ func Test_ScanStruct(t *testing.T) {
 				"total":      12.00,
 				"created_at": timestamp,
 				"is_active":  true,
+				"row_count":  0,
 			},
 			expectedErr: false,
 		},
@@ -95,6 +103,7 @@ func Test_ScanStruct(t *testing.T) {
 				"total":      12.00,
 				"created_at": nil,
 				"is_active":  true,
+				"row_count":  2,
 			},
 			expectedErr: false,
 		},
@@ -105,6 +114,7 @@ func Test_ScanStruct(t *testing.T) {
 				"total":      12.00,
 				"created_at": nil,
 				"is_active":  false,
+				"row_count":  2,
 			},
 			expectedErr: false,
 		},
@@ -115,6 +125,7 @@ func Test_ScanStruct(t *testing.T) {
 				"total":      12.00,
 				"created_at": timestamp,
 				"is_active":  true,
+				"row_count":  2,
 			},
 			expectedErr: true,
 		},
@@ -125,6 +136,7 @@ func Test_ScanStruct(t *testing.T) {
 				"total":      "",
 				"created_at": timestamp,
 				"is_active":  true,
+				"row_count":  2,
 			},
 			expectedErr: true,
 		},
@@ -144,6 +156,7 @@ func Test_ScanStruct(t *testing.T) {
 			require.Equal(tc.sqlResults["name"].(string), tc.testStruct.Name)
 			require.Equal(tc.sqlResults["total"].(float64), tc.testStruct.Total)
 			require.Equal(tc.sqlResults["is_active"].(bool), tc.testStruct.IsActive)
+			require.Equal(tc.sqlResults["row_count"].(int), tc.testStruct.RowCount)
 
 			if v, _ := tc.sqlResults["created_at"]; v != nil {
 				require.Equal(timestamp, tc.testStruct.CreatedAt)
@@ -184,6 +197,7 @@ func Test_ScanStructSlice(t *testing.T) {
 					"total":      12.00,
 					"created_at": timestamp,
 					"is_active":  true,
+					"row_count":  2,
 				},
 			},
 			expectedErr: false,
@@ -197,6 +211,7 @@ func Test_ScanStructSlice(t *testing.T) {
 					"total":      12.00,
 					"created_at": timestamp,
 					"is_active":  true,
+					"row_count":  2,
 				},
 				{
 					"id":         2,
@@ -204,6 +219,7 @@ func Test_ScanStructSlice(t *testing.T) {
 					"total":      0.00,
 					"created_at": timestamp,
 					"is_active":  false,
+					"row_count":  2,
 				},
 			},
 			expectedErr: false,
@@ -217,6 +233,7 @@ func Test_ScanStructSlice(t *testing.T) {
 					"total":      12.00,
 					"created_at": timestamp,
 					"is_active":  true,
+					"row_count":  2,
 				},
 				{
 					"id":         2,
@@ -224,6 +241,7 @@ func Test_ScanStructSlice(t *testing.T) {
 					"total":      0.00,
 					"created_at": timestamp,
 					"is_active":  false,
+					"row_count":  2,
 				},
 				{
 					"id":         3,
@@ -231,6 +249,7 @@ func Test_ScanStructSlice(t *testing.T) {
 					"total":      "",
 					"created_at": timestamp,
 					"is_active":  false,
+					"row_count":  2,
 				},
 			},
 			expectedErr: true,
@@ -250,6 +269,7 @@ func Test_ScanStructSlice(t *testing.T) {
 				require.Equal(r["name"].(string), tc.testStruct[i].Name)
 				require.Equal(r["total"].(float64), tc.testStruct[i].Total)
 				require.Equal(r["is_active"].(bool), tc.testStruct[i].IsActive)
+				require.Equal(r["row_count"].(int), tc.testStruct[i].RowCount)
 
 				if v, _ := tc.sqlResults[i]["created_at"]; v != nil {
 					require.Equal(timestamp, tc.testStruct[i].CreatedAt)
